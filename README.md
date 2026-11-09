@@ -326,6 +326,7 @@ Estos usuarios se crean con `database/02_seed.sql`.
 | Administrador | `admin@eltornillo.local` | `Admin123` |
 | Vendedor | `vendedor@eltornillo.local` | `Vendedor123` |
 | Comprador | `comprador@eltornillo.local` | `Comprador123` |
+| Comprador | `comprador2@eltornillo.local` | `Comprador123` |
 
 **Base de datos (MySQL en Docker):**
 
@@ -458,8 +459,7 @@ El repositorio sigue **GitFlow**.
 | Componente | Estado |
 |---|---|
 | README y arquitectura | ✅ Versión inicial |
-| Repositorio y ramas GitFlow | ⏳ Pendiente |
-| Base de datos en Docker (`schema` y `seed`) | ⏳ Pendiente |
+| Base de datos en Docker (`schema` y `seed`) | ✅ Listo |
 | Index (catálogo y buscador) | ⏳ Pendiente |
 | Login y Register | ⏳ Pendiente |
 | Vista de comprador (carrito y facturas) | ⏳ Pendiente |
@@ -467,8 +467,3 @@ El repositorio sigue **GitFlow**.
 | Panel de administrador | ⏳ Pendiente |
 | Script `install.sh` | ⏳ Pendiente |
 | Prueba de instalación completa desde cero | ⏳ Pendiente |
-
-**Fechas clave:**
-
-- **Viernes 27 de noviembre de 2026:** entrega e instalación en el Laboratorio 4.
-- **Lunes 30 de noviembre y martes 1 de diciembre de 2026:** etapa de ataque.
