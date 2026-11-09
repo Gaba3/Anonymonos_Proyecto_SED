@@ -8,6 +8,11 @@ CREATE DATABASE IF NOT EXISTS ferreteria
 
 USE ferreteria;
 
+-- Los scripts se cargan con el cliente mysql, cuyo juego de caracteres
+-- por omision puede no ser utf8mb4. Sin esta linea los acentos se
+-- guardan con doble codificacion.
+SET NAMES utf8mb4;
+
 -- Orden inverso al de creación, por las llaves foráneas.
 DROP TABLE IF EXISTS detalle_factura;
 DROP TABLE IF EXISTS facturas;

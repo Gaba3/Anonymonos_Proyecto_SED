@@ -6,6 +6,10 @@
 
 USE ferreteria;
 
+-- Imprescindible: sin esto los acentos de los nombres de productos y
+-- usuarios se guardan con doble codificacion. Ver 01_schema.sql.
+SET NAMES utf8mb4;
+
 -- ---------------------------------------------------------------------
 -- usuarios
 -- ---------------------------------------------------------------------

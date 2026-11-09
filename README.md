@@ -460,7 +460,7 @@ El repositorio sigue **GitFlow**.
 |---|---|
 | README y arquitectura | ✅ Versión inicial |
 | Base de datos en Docker (`schema` y `seed`) | ✅ Listo |
-| Index (catálogo y buscador) | ⏳ Pendiente |
+| Index (catálogo y buscador) | ✅ Listo |
 | Login y Register | ⏳ Pendiente |
 | Vista de comprador (carrito y facturas) | ⏳ Pendiente |
 | Vista de vendedor | ⏳ Pendiente |
