@@ -1,0 +1,68 @@
+# Ferretería El Tornillo — contenedor de la base de datos
+#
+# Solo MySQL corre en Docker. Apache y PHP se instalan directamente en la VM
+# (ver sección 3 del README.md).
+#
+# Uso:
+#   cd /var/www/ferreteria/docker
+#   docker compose up -d
+#   docker compose ps
+#
+# Los scripts de ../database se montan en /docker-entrypoint-initdb.d y MySQL
+# los ejecuta en orden alfabético la PRIMERA vez que se crea el volumen:
+#   01_schema.sql  -> tablas
+#   02_seed.sql    -> categorías, productos, usuarios y facturas de prueba
+#
+# Para volver a cargarlos desde cero hay que borrar el volumen:
+#   docker compose down -v && docker compose up -d
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: ferreteria_db
+    restart: unless-stopped
+
+    environment:
+      # Credenciales documentadas en la sección 4 del README.md
+      MYSQL_ROOT_PASSWORD: "R00t.Tornillo.2026"
+      MYSQL_DATABASE: "ferreteria"
+      MYSQL_USER: "ferreteria_app"
+      MYSQL_PASSWORD: "App.Tornillo.2026"
+      TZ: "America/El_Salvador"
+
+    # ------------------------------------------------------------------
+    # V2 — Puertos abiertos innecesarios (VULNERABILIDAD INTENCIONAL)
+    # ------------------------------------------------------------------
+    # El puerto 3306 se publica en TODAS las interfaces de la VM (0.0.0.0),
+    # de modo que cualquier equipo de la red del laboratorio puede conectarse
+    # directamente a MySQL. La aplicación solo necesita acceso local.
+    #
+    # NO CORREGIR: es una de las tres vulnerabilidades documentadas
+    # (sección 5 del README.md). La forma segura sería:
+    #     - "127.0.0.1:3306:3306"
+    # o no publicar el puerto y usar una red interna de Docker.
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - ../database:/docker-entrypoint-initdb.d:ro
+      - db_data:/var/lib/mysql
+
+    # mysql_native_password mantiene la compatibilidad con clientes MySQL
+    # antiguos (mysql-client, PHP compilado sin mysqlnd, herramientas de
+    # pentesting). En MySQL 8.0 el plugin por defecto es caching_sha2_password.
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  db_data:
+    name: ferreteria_db_data
