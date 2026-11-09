@@ -1,0 +1,26 @@
+diff --git a/database/01_schema.sql b/database/01_schema.sql
+index 693367e..ed988d4 100644
+--- a/database/01_schema.sql
++++ b/database/01_schema.sql
+@@ -8,6 +8,11 @@ CREATE DATABASE IF NOT EXISTS ferreteria
+ 
+ USE ferreteria;
+ 
++-- Los scripts se cargan con el cliente mysql, cuyo juego de caracteres
++-- por omision puede no ser utf8mb4. Sin esta linea, los acentos y la n
++-- se guardan con doble codificacion ('e' acentuada quedaria como 'A©').
++SET NAMES utf8mb4;
++
+ -- Orden inverso al de creación, por las llaves foráneas.
+ DROP TABLE IF EXISTS detalle_factura;
+ DROP TABLE IF EXISTS facturas;
+diff --git a/database/02_seed.sql b/database/02_seed.sql
+index c0063d1..ab30b7a 100644
+--- a/database/02_seed.sql
++++ b/database/02_seed.sql
+@@ -6,6 +6,10 @@
+ 
+ USE ferreteria;
+ -- ---------------------------------------------------------------------
+ -- usuarios
+ -- ---------------------------------------------------------------------
