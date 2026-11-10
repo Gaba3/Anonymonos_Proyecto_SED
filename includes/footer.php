@@ -15,10 +15,7 @@
             </div>
             <div class="col-md-6 text-md-end">
                 <p class="small mb-0">
-                    Proyecto académico &middot; Seguridad en entornos de desarrollo
-                </p>
-                <p class="small mb-0">
-                    Universidad Centroamericana &laquo;José Simeón Cañas&raquo;
+                    &copy; <?= date('Y') ?> <?= e(APP_NOMBRE) ?>. Todos los derechos reservados.
                 </p>
             </div>
         </div>

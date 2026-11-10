@@ -7,13 +7,19 @@ $titulo_pagina = $titulo_pagina ?? '';
 $usuario       = usuario_actual();
 $rol           = $usuario['rol'] ?? null;
 
-$pagina_actual = basename($_SERVER['SCRIPT_NAME'] ?? '');
+$ruta_script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
 
-function clase_activa(string $archivo): string
+function clase_activa(string $archivo_o_ruta): string
 {
-    global $pagina_actual;
+    global $ruta_script;
 
-    return $pagina_actual === $archivo ? ' active' : '';
+    // Si viene solo un archivo simple como 'panel.php', revisa si termina en /panel.php
+    // Si viene una ruta como 'public/index.php', compara con la terminación exacta
+    if (str_contains($archivo_o_ruta, '/')) {
+        return str_ends_with($ruta_script, '/' . ltrim($archivo_o_ruta, '/')) ? ' active' : '';
+    }
+
+    return basename($ruta_script) === $archivo_o_ruta ? ' active' : '';
 }
 ?>
 <!doctype html>
@@ -68,7 +74,7 @@ function clase_activa(string $archivo): string
 
                 <?php elseif ($rol === 'admin'): ?>
                     <li class="nav-item">
-                        <a class="nav-link<?= clase_activa('index.php') ?>" href="<?= url('admin/index.php') ?>">Panel</a>
+                        <a class="nav-link<?= clase_activa('panel.php') ?>" href="<?= url('admin/panel.php') ?>">Panel</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link<?= clase_activa('productos.php') ?>" href="<?= url('admin/productos.php') ?>">Productos</a>

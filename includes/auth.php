@@ -70,7 +70,7 @@ function inicio_por_rol(string $rol): string
 {
     switch ($rol) {
         case 'admin':
-            return url('admin/index.php');
+            return url('admin/panel.php');
         case 'vendedor':
             return url('vendedor/mis-productos.php');
         case 'comprador':
