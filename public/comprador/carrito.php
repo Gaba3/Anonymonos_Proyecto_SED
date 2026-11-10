@@ -33,7 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $actual = $_SESSION['carrito'][$pid] ?? 0;
                 $nuevo_total = min((int)$prod['stock'], $actual + $cantidad);
                 $_SESSION['carrito'][$pid] = $nuevo_total;
-                redirigir(url('comprador/catalogo.php?agregado=1'));
+
+                $retorno = $_POST['retorno'] ?? '';
+                if ($retorno !== '' && str_starts_with($retorno, '/')) {
+                    $sep = str_contains($retorno, '?') ? '&' : '?';
+                    redirigir($retorno . $sep . 'agregado=1');
+                } else {
+                    redirigir(url('comprador/catalogo.php?agregado=1'));
+                }
             }
         }
     }

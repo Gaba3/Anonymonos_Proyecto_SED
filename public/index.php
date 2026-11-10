@@ -78,6 +78,14 @@ $titulo_pagina = 'Catálogo';
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
+<?php if (isset($_GET['agregado'])): ?>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        Producto agregado al carrito exitosamente.
+        <a href="<?= url('comprador/carrito.php') ?>" class="alert-link">Ver carrito</a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+<?php endif; ?>
+
 <div class="p-4 p-md-5 mb-4 rounded-3 bg-white border">
     <div class="row align-items-center g-3">
         <div class="col-md-7">
@@ -169,9 +177,19 @@ require_once __DIR__ . '/../includes/header.php';
                             Inicie sesión para comprar
                         </a>
                     <?php elseif (rol_actual() === 'comprador'): ?>
-                        <a class="btn btn-sm btn-naranja mt-3" href="<?= url('comprador/catalogo.php') ?>">
-                            Comprar
-                        </a>
+                        <?php $agotado = ($stock <= 0); ?>
+                        <form method="post" action="<?= url('comprador/carrito.php') ?>" class="mt-3">
+                            <input type="hidden" name="accion" value="agregar">
+                            <input type="hidden" name="producto_id" value="<?= (int) $p['id'] ?>">
+                            <input type="hidden" name="retorno" value="<?= e($_SERVER['REQUEST_URI'] ?? url('index.php')) ?>">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">Cant.</span>
+                                <input type="number" name="cantidad" class="form-control" value="1" min="1" max="<?= max(1, $stock) ?>" <?= $agotado ? 'disabled' : '' ?>>
+                                <button class="btn btn-naranja" type="submit" <?= $agotado ? 'disabled' : '' ?>>
+                                    Agregar
+                                </button>
+                            </div>
+                        </form>
                     <?php endif; ?>
                 </div>
             </div>
