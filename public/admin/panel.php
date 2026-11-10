@@ -57,16 +57,16 @@ require_once __DIR__ . '/../../includes/header.php';
 <!-- Tarjetas de métricas -->
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
-        <div class="card shadow-sm border-0 h-100" style="border-left: 4px solid var(--naranja) !important;">
+        <div class="card shadow-sm border border-light-subtle h-100 bg-white">
             <div class="card-body">
-                <div class="text-muted small text-uppercase fw-semibold mb-1">Usuarios registrados</div>
+                <div class="text-secondary small text-uppercase fw-semibold mb-2">Usuarios registrados</div>
                 <div class="fs-2 fw-bold text-dark"><?= $total_users ?></div>
                 <div class="small text-muted mt-1">
                     <?= $total_comprador ?> compradores &bull; <?= $total_vendedor ?> vendedores
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0 pt-0">
-                <a href="<?= url('admin/usuarios.php') ?>" class="small text-decoration-none text-naranja fw-semibold">
+                <a href="<?= url('admin/usuarios.php') ?>" class="small text-decoration-none text-muted fw-semibold">
                     Ver usuarios &rarr;
                 </a>
             </div>
@@ -74,16 +74,16 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 
     <div class="col-sm-6 col-xl-3">
-        <div class="card shadow-sm border-0 h-100" style="border-left: 4px solid #198754 !important;">
+        <div class="card shadow-sm border border-light-subtle h-100 bg-white">
             <div class="card-body">
-                <div class="text-muted small text-uppercase fw-semibold mb-1">Productos en catálogo</div>
+                <div class="text-secondary small text-uppercase fw-semibold mb-2">Productos en catálogo</div>
                 <div class="fs-2 fw-bold text-dark"><?= $total_prods ?></div>
                 <div class="small text-muted mt-1">
                     <?= $total_stock ?> unidades en stock global
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0 pt-0">
-                <a href="<?= url('admin/productos.php') ?>" class="small text-decoration-none text-success fw-semibold">
+                <a href="<?= url('admin/productos.php') ?>" class="small text-decoration-none text-muted fw-semibold">
                     Ver inventario &rarr;
                 </a>
             </div>
@@ -91,9 +91,9 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 
     <div class="col-sm-6 col-xl-3">
-        <div class="card shadow-sm border-0 h-100" style="border-left: 4px solid #0d6efd !important;">
+        <div class="card shadow-sm border border-light-subtle h-100 bg-white">
             <div class="card-body">
-                <div class="text-muted small text-uppercase fw-semibold mb-1">Total Facturas</div>
+                <div class="text-secondary small text-uppercase fw-semibold mb-2">Total Facturas</div>
                 <div class="fs-2 fw-bold text-dark"><?= $total_facturas ?></div>
                 <div class="small text-muted mt-1">Órdenes procesadas</div>
             </div>
@@ -104,10 +104,10 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 
     <div class="col-sm-6 col-xl-3">
-        <div class="card shadow-sm border-0 h-100" style="border-left: 4px solid #ffc107 !important;">
+        <div class="card shadow-sm border border-light-subtle h-100 bg-white">
             <div class="card-body">
-                <div class="text-muted small text-uppercase fw-semibold mb-1">Ventas Totales</div>
-                <div class="fs-2 fw-bold text-naranja"><?= dinero($total_ventas) ?></div>
+                <div class="text-secondary small text-uppercase fw-semibold mb-2">Ventas Totales</div>
+                <div class="fs-2 fw-bold text-dark"><?= dinero($total_ventas) ?></div>
                 <div class="small text-muted mt-1">Facturación acumulada</div>
             </div>
             <div class="card-footer bg-transparent border-0 pt-0">
@@ -147,7 +147,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                             <small class="text-muted"><?= e($u['correo']) ?></small>
                                         </td>
                                         <td>
-                                            <span class="badge <?= $u['rol'] === 'admin' ? 'bg-danger' : ($u['rol'] === 'vendedor' ? 'bg-primary' : 'bg-secondary') ?>">
+                                            <span class="badge <?= $u['rol'] === 'admin' ? 'badge-subtle-admin' : ($u['rol'] === 'vendedor' ? 'badge-subtle-vendedor' : 'badge-subtle-comprador') ?> px-2 py-1">
                                                 <?= e($u['rol']) ?>
                                             </span>
                                         </td>

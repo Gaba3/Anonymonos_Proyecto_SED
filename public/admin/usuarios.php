@@ -132,7 +132,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <p class="text-secondary mb-0">Control de cuentas, asignación de roles y permisos de acceso.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="<?= url('admin/index.php') ?>" class="btn btn-outline-secondary">&larr; Panel</a>
+        <a href="<?= url('admin/panel.php') ?>" class="btn btn-outline-secondary">&larr; Panel</a>
         <button class="btn btn-naranja" data-bs-toggle="modal" data-bs-target="#modalCrearUsuario">
             + Nuevo Usuario
         </button>
@@ -197,7 +197,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                 </td>
                                 <td><?= e($u['correo']) ?></td>
                                 <td class="text-center">
-                                    <span class="badge <?= $u['rol'] === 'admin' ? 'bg-danger' : ($u['rol'] === 'vendedor' ? 'bg-primary' : 'bg-success') ?>">
+                                    <span class="badge <?= $u['rol'] === 'admin' ? 'badge-subtle-admin' : ($u['rol'] === 'vendedor' ? 'badge-subtle-vendedor' : 'badge-subtle-comprador') ?> px-2 py-1">
                                         <?= e($u['rol']) ?>
                                     </span>
                                 </td>

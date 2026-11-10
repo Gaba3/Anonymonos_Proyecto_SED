@@ -169,7 +169,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <p class="text-secondary mb-0">Control total del catálogo: crear, actualizar y eliminar artículos.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="<?= url('admin/index.php') ?>" class="btn btn-outline-secondary">&larr; Panel</a>
+        <a href="<?= url('admin/panel.php') ?>" class="btn btn-outline-secondary">&larr; Panel</a>
         <button class="btn btn-naranja" data-bs-toggle="modal" data-bs-target="#modalCrearProd">
             + Nuevo Producto
         </button>
