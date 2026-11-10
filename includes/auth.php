@@ -80,6 +80,14 @@ function inicio_por_rol(string $rol): string
     }
 }
 
+function destino_tras_login(string $rol): string
+{
+    $destino = inicio_por_rol($rol);
+    $archivo = __DIR__ . '/../public/' . ltrim(substr($destino, strlen(BASE_URL)), '/');
+
+    return is_file($archivo) ? $destino : url('index.php');
+}
+
 function redirigir(string $destino): void
 {
     header('Location: ' . $destino);
