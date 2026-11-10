@@ -36,6 +36,23 @@ if (MOSTRAR_ERRORES) {
 
 date_default_timezone_set('America/El_Salvador');
 
+// ---------------------------------------------------------------------
+// Polyfills para multibyte si la extensión mbstring no está activa en PHP
+// ---------------------------------------------------------------------
+if (!function_exists('mb_strlen')) {
+    function mb_strlen(?string $string, ?string $encoding = null): int
+    {
+        return strlen((string) $string);
+    }
+}
+
+if (!function_exists('mb_substr')) {
+    function mb_substr(?string $string, int $start, ?int $length = null, ?string $encoding = null): string
+    {
+        return $length === null ? substr((string) $string, $start) : substr((string) $string, $start, $length);
+    }
+}
+
 function e(?string $texto): string
 {
     return htmlspecialchars((string) $texto, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
