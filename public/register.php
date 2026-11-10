@@ -36,12 +36,15 @@ const LARGO_MINIMO_PASSWORD = 8;
 $errores = [];
 $nombre  = '';
 $correo  = '';
+$tipo_cuenta = 'comprador';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nombre    = trim($_POST['nombre'] ?? '');
-    $correo    = trim($_POST['correo'] ?? '');
-    $password  = $_POST['password'] ?? '';
-    $password2 = $_POST['password2'] ?? '';
+    $nombre      = trim($_POST['nombre'] ?? '');
+    $correo      = trim($_POST['correo'] ?? '');
+    $password    = $_POST['password'] ?? '';
+    $password2   = $_POST['password2'] ?? '';
+    $tipo_cuenta = $_POST['tipo_cuenta'] ?? 'comprador';
+    $rol         = in_array($tipo_cuenta, ['comprador', 'vendedor'], true) ? $tipo_cuenta : 'comprador';
 
     // -----------------------------------------------------------------
     // Validación de los datos del formulario
@@ -96,14 +99,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // -----------------------------------------------------------------
     if ($errores === []) {
         $sql = "INSERT INTO usuarios (nombre, correo, password, rol)
-                VALUES (?, ?, MD5(?), 'comprador')";
+                VALUES (?, ?, MD5(?), ?)";
 
         $stmt = mysqli_prepare($conn, $sql);
 
         if ($stmt === false) {
             $errores[] = 'No se pudo crear la cuenta. Intente de nuevo.';
         } else {
-            mysqli_stmt_bind_param($stmt, 'sss', $nombre, $correo, $password);
+            mysqli_stmt_bind_param($stmt, 'ssss', $nombre, $correo, $password, $rol);
             $alta_ok = mysqli_stmt_execute($stmt);
 
             // 1062 = entrada duplicada. Puede pasar si dos registros con
@@ -168,11 +171,30 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="form-text">Mínimo <?= LARGO_MINIMO_PASSWORD ?> caracteres.</div>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-3">
                 <label class="form-label" for="password2">Repetir la contraseña</label>
                 <input class="form-control" type="password" id="password2" name="password2"
                        minlength="<?= LARGO_MINIMO_PASSWORD ?>"
                        autocomplete="new-password" required>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label d-block">Tipo de cuenta</label>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="tipo_cuenta" id="rol_comprador"
+                           value="comprador" <?= $tipo_cuenta !== 'vendedor' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="rol_comprador">
+                        Comprador
+                    </label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="tipo_cuenta" id="rol_vendedor"
+                           value="vendedor" <?= $tipo_cuenta === 'vendedor' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="rol_vendedor">
+                        Vendedor
+                    </label>
+                </div>
+                <div class="form-text">Los vendedores pueden publicar y gestionar sus propios productos.</div>
             </div>
 
             <button class="btn btn-naranja w-100" type="submit">Crear cuenta</button>
@@ -186,8 +208,8 @@ require_once __DIR__ . '/../includes/header.php';
 
     <div class="card-footer bg-white border-top">
         <p class="small text-secondary mb-0">
-            Las cuentas nuevas se crean como <strong>comprador</strong>.
-            El administrador puede cambiar el rol desde su panel.
+            Puedes registrarte como <strong>comprador</strong> o <strong>vendedor</strong>.
+        
         </p>
     </div>
 </div>

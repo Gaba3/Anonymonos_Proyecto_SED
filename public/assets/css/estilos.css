@@ -160,3 +160,25 @@ body {
 footer a {
     color: #fff;
 }
+
+/* Badges con tonos suaves y elegantes para tablas/paneles */
+.badge-subtle-admin {
+    background-color: #fde8e8 !important;
+    color: #9b1c1c !important;
+    border: 1px solid #f8b4b4;
+    font-weight: 600;
+}
+
+.badge-subtle-vendedor {
+    background-color: #e1effe !important;
+    color: #1e429f !important;
+    border: 1px solid #b3d1ff;
+    font-weight: 600;
+}
+
+.badge-subtle-comprador {
+    background-color: #f3f4f6 !important;
+    color: #374151 !important;
+    border: 1px solid #e5e7eb;
+    font-weight: 600;
+}
