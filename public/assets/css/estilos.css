@@ -9,6 +9,26 @@
     --gris-claro:      #f4f5f7;
 }
 
+/*
+ * Fondo del lienzo (canvas) del navegador.
+ *
+ * El <header> y el <footer> usan el gris oscuro. Al hacer scroll "de más"
+ * (rebote elástico en macOS/iOS o con trackpad), el navegador muestra el
+ * fondo del elemento raíz en la zona que queda por fuera de la página.
+ * Si <html> no tiene color propio, esa zona se pintaba con el gris claro
+ * del <body> (o el blanco del navegador) y se veía una franja clara por
+ * encima del header o por debajo del footer.
+ *
+ * Al darle a <html> el mismo gris oscuro del header/footer, el rebote
+ * superior e inferior se pinta de ese color y el header y el footer
+ * parecen extenderse aunque se scrollee de más.
+ */
+html {
+    background-color: var(--gris-oscuro);
+    /* Evita el encadenamiento del rebote hacia la ventana del navegador. */
+    overscroll-behavior-y: none;
+}
+
 body {
     background-color: var(--gris-claro);
     color: var(--gris-oscuro);

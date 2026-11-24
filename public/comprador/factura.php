@@ -6,34 +6,37 @@
  *
  * Muestra el detalle de una factura: comprador, fecha, productos y total.
  *
- * ---------------------------------------------------------------------
- * CONTIENE LA VULNERABILIDAD V3 (IDOR) — NO CORREGIR
- * ---------------------------------------------------------------------
- * La vista comprueba que el usuario tenga rol de 'comprador', pero NO
- * valida que la factura solicitada le pertenezca. Cualquier comprador
- * puede acceder a las facturas de otros cambiando el parámetro id en la
- * URL (?id=X). Documentado en la sección 5 del README.md.
+ * Control de acceso: además de exigir el rol de 'comprador', la consulta
+ * filtra por el comprador de la sesión, de modo que un usuario solo puede
+ * ver SUS propias facturas. Si cambia el parámetro id por el de una
+ * factura ajena, la consulta no devuelve nada y se muestra "no encontrada"
+ * (evita el IDOR / referencia directa insegura a objetos).
  */
 
 require_once __DIR__ . '/../../includes/auth.php';
-requerir_rol('comprador'); // Solo valida el rol, no la propiedad del recurso (VULNERABILIDAD V3)
+requerir_rol('comprador');
 
-$id = (int) ($_GET['id'] ?? 0);
+$id           = (int) ($_GET['id'] ?? 0);
+$comprador_id = usuario_id();
 
 // ---------------------------------------------------------------------
-// Consulta de la factura — VULNERABILIDAD V3 (IDOR)
+// Consulta de la factura
 // ---------------------------------------------------------------------
-// Falta deliberadamente: AND f.comprador_id = usuario_id()
+// Se filtra por el id de la factura Y por el comprador de la sesión. El
+// id y el comprador_id son enteros (cast con (int) y usuario_id()), así
+// que no hay concatenación de texto del usuario en la consulta.
 $sql = "SELECT f.id, f.fecha, f.total, u.nombre, u.correo
         FROM facturas f
         JOIN usuarios u ON u.id = f.comprador_id
-        WHERE f.id = $id";
+        WHERE f.id = $id AND f.comprador_id = $comprador_id";
 
 $resultado = mysqli_query($conn, $sql);
 $factura = ($resultado !== false) ? mysqli_fetch_assoc($resultado) : null;
 
 $detalles = [];
 if ($factura !== null) {
+    // Solo se cargan los renglones si la factura es del usuario (la
+    // comprobación anterior ya lo garantiza).
     $sql_det = "SELECT d.cantidad, d.precio_unitario, d.subtotal, p.nombre, p.imagen, c.nombre AS categoria
                 FROM detalle_factura d
                 JOIN productos p ON p.id = d.producto_id

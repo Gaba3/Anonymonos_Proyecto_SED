@@ -5,7 +5,10 @@ define('DB_HOST', '127.0.0.1');
 define('DB_PORT', 3306);
 define('DB_NAME', 'ferreteria');
 define('DB_USER', 'ferreteria_app');
-define('DB_PASS', 'App.Tornillo.2026');
+// La contraseña de la cuenta de la aplicación coincide con docker-compose.yml.
+// Es débil a propósito: forma parte de la vulnerabilidad V2 (base de datos
+// expuesta a la red con una cuenta de contraseña adivinable).
+define('DB_PASS', 'ferreteria');
 
 // ---------------------------------------------------------------------
 // Datos del sitio
