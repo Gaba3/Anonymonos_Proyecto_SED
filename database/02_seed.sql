@@ -70,11 +70,10 @@ INSERT INTO productos (id, vendedor_id, categoria_id, nombre, descripcion, preci
 -- ---------------------------------------------------------------------
 -- facturas y detalle_factura
 -- ---------------------------------------------------------------------
--- Se cargan facturas de DOS compradores distintos (id 3 y id 4) a
--- propósito: así V3 (IDOR en public/comprador/factura.php) se puede
--- demostrar desde el momento de la instalación. Iniciando sesión como
--- comprador@eltornillo.local (id = 3) y abriendo factura.php?id=2 se ven
--- los datos de José Ramírez (id = 4).
+-- Se cargan facturas de DOS compradores distintos (id 3 y id 4) para
+-- tener datos de más de un cliente en el catálogo de pruebas. La vista
+-- public/comprador/factura.php filtra por el comprador de la sesión, de
+-- modo que cada usuario solo ve sus propias facturas.
 INSERT INTO facturas (id, comprador_id, fecha, total) VALUES
     (1, 3, '2026-11-03 10:15:00', 30.85),
     (2, 4, '2026-11-05 16:40:00', 81.60),

