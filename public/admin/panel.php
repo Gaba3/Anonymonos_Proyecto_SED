@@ -167,7 +167,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h2 class="h6 mb-0 fw-bold">Últimas facturas emitidas</h2>
-                <a href="<?= url('facturas/index.php') ?>" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+                <a href="<?= url('admin/facturas.php') ?>" class="btn btn-sm btn-outline-secondary">Ver todas</a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
