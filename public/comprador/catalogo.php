@@ -123,7 +123,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="col">
                 <div class="card card-producto h-100 shadow-sm d-flex flex-column">
                     <div class="caja-imagen">
-                        <img src="<?= imagen_producto($p['imagen']) ?>" alt="<?= e($p['nombre']) ?>" loading="lazy">
+                        <img src="<?= imagen_producto($p['imagen'], $p['nombre']) ?>" alt="<?= e($p['nombre']) ?>" loading="lazy">
                     </div>
                     <div class="card-body d-flex flex-column">
                         <div class="text-muted small mb-1"><?= e($p['categoria'] ?? 'Sin categoría') ?></div>

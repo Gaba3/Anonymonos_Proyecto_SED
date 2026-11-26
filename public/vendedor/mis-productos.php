@@ -128,7 +128,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <?php foreach ($productos as $p): ?>
                             <tr>
                                 <td>
-                                    <img src="<?= imagen_producto($p['imagen']) ?>" alt="" width="50" height="50" style="object-fit: contain;" class="rounded border bg-white p-1">
+                                    <img src="<?= imagen_producto($p['imagen'], $p['nombre']) ?>" alt="" width="50" height="50" style="object-fit: contain;" class="rounded border bg-white p-1">
                                 </td>
                                 <td>
                                     <div class="fw-bold"><?= e($p['nombre']) ?></div>
