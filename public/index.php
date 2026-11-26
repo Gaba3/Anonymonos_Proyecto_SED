@@ -150,7 +150,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
             <div class="card card-producto">
                 <div class="caja-imagen">
-                    <img src="<?= e(imagen_producto($p['imagen'])) ?>"
+                    <img src="<?= e(imagen_producto($p['imagen'], $p['nombre'])) ?>"
                          alt="<?= e($p['nombre']) ?>" loading="lazy">
                 </div>
                 <div class="card-body d-flex flex-column">

@@ -228,7 +228,7 @@ require_once __DIR__ . '/../../includes/header.php';
                             <tr>
                                 <td class="text-muted fw-bold"><?= $p['id'] ?></td>
                                 <td>
-                                    <img src="<?= imagen_producto($p['imagen']) ?>" alt="" width="48" height="48" style="object-fit: contain;" class="rounded border bg-white p-1">
+                                    <img src="<?= imagen_producto($p['imagen'], $p['nombre']) ?>" alt="" width="48" height="48" style="object-fit: contain;" class="rounded border bg-white p-1">
                                 </td>
                                 <td>
                                     <div class="fw-bold"><?= e($p['nombre']) ?></div>

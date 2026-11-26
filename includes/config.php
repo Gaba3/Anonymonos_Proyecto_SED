@@ -69,13 +69,19 @@ function dinero($monto): string
     return '$' . number_format((float) $monto, 2, '.', ',');
 }
 
-function imagen_producto(?string $archivo): string
+function imagen_producto(?string $archivo, string $nombre = ''): string
 {
-    if ($archivo === null || trim($archivo) === '') {
-        return IMG_SIN_FOTO;
+    if ($archivo !== null && trim($archivo) !== '') {
+        return URL_UPLOADS . rawurlencode($archivo);
     }
 
-    return URL_UPLOADS . rawurlencode($archivo);
+    $imagen_catalogo = str_replace(['/', '\\'], '⁄', $nombre) . '.jpg';
+
+    if (is_file(__DIR__ . '/../public/assets/catalog/' . $imagen_catalogo)) {
+        return url('assets/catalog/' . rawurlencode($imagen_catalogo));
+    }
+
+    return IMG_SIN_FOTO;
 }
 
 function fecha_legible(?string $fecha): string
