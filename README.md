@@ -293,7 +293,7 @@ define('DB_HOST', '127.0.0.1');
 define('DB_PORT', 3306);
 define('DB_NAME', 'ferreteria');
 define('DB_USER', 'ferreteria_app');
-define('DB_PASS', '<definido en docker-compose.yml>');
+define('DB_PASS', 'ferreteria');   // igual que MYSQL_PASSWORD en docker-compose.yml
 ```
 
 ### 3.7 Configurar Apache
@@ -338,18 +338,23 @@ Estos usuarios se crean con `database/02_seed.sql`.
 
 | Usuario | Contraseña | Uso |
 |---|---|---|
-| `ferreteria_app` | _definida en `docker-compose.yml`_ | Conexión de la aplicación |
-| `root` | _definida en `docker-compose.yml`_ | Administración del contenedor |
+| `ferreteria_app` | `ferreteria` (débil **a propósito** — ver V2) | Conexión de la aplicación; accesible en remoto (`@'%'`) |
+| `root` | `R00t.Tornillo.2026` | Administración del contenedor; **solo** desde `localhost` |
+
+> La contraseña de `ferreteria_app` es intencionalmente débil y la cuenta es accesible desde la red: forma parte de la vulnerabilidad V2 (sección 5). `root` no es accesible en remoto.
 
 ---
 
 ## 5. Vulnerabilidades implementadas
 
+El proyecto incluye **dos** vulnerabilidades, introducidas y documentadas de forma deliberada. Ambas son **explotables de extremo a extremo** desde la red del laboratorio. El resto del código es correcto y seguro (sentencias preparadas, `htmlspecialchars()` al imprimir, verificación de rol y de propiedad en cada vista restringida), para que estas dos sean las únicas puertas de entrada.
+
 | # | Vulnerabilidad | Nivel | Ubicación |
 |---|---|---|---|
 | V1 | Inyección SQL (SQLi) | Código | `public/login.php`, `public/index.php` (buscador) |
-| V2 | Puertos abiertos innecesarios | Servidor | `docker/docker-compose.yml` |
-| V3 | IDOR (Insecure Direct Object Reference) | Código | `public/comprador/factura.php` |
+| V2 | Base de datos expuesta a la red con cuenta débil | Servidor | `docker/docker-compose.yml` |
+
+> **Nota sobre las pistas.** Como el proyecto también se usa como ejercicio de ataque, en el código **que llega al navegador** se dejaron pistas sutiles (no obvias) para que un atacante atento reconozca cada vulnerabilidad sin que se le entregue el exploit resuelto. Se describen en cada vulnerabilidad, en el apartado *Pistas dejadas*. Los comentarios de PHP (`//`, `/* */`) y de SQL (`--`) **no** se envían al navegador: sirven para el equipo de desarrollo y no cuentan como pistas para el atacante.
 
 ### V1 — Inyección SQL
 
@@ -376,7 +381,7 @@ $sql = "SELECT id, nombre, descripcion, precio, imagen FROM productos
         WHERE nombre LIKE '%$q%'";
 ```
 
-**Consideraciones de diseño:** los mensajes de error de MySQL se muestran en pantalla para facilitar la identificación de la vulnerabilidad durante la etapa de ataque.
+**Consideraciones de diseño:** los mensajes de error de MySQL se muestran en pantalla (`includes/config.php` → `MOSTRAR_ERRORES = true`) para facilitar la identificación de la vulnerabilidad durante la etapa de ataque. Además, el campo de correo del login usa `type="text"` (y no `type="email"`) a propósito, para que el navegador no rechace las comillas antes de enviar el formulario.
 
 **Cómo explotarla — paso a paso.**
  
@@ -445,9 +450,16 @@ mysqli_stmt_bind_param($stmt, 's', $patron);
 3. **Ocultar los errores de base de datos al usuario** en producción (`display_errors = Off`), registrándolos solo en el log del servidor, y devolver un mensaje genérico.
 4. **Validar y tipar la entrada** (longitud, formato de correo) como defensa en profundidad, sin que sustituya a las sentencias preparadas.
 
-### V2 — Puertos abiertos innecesarios
+1. **Saltar el login (autenticación).** En el campo de correo escribir una entrada que cierre la comilla y comente el resto:
+   ```
+   Correo:    admin@eltornillo.local' -- -
+   Contraseña: (cualquier cosa)
+   ```
+   La consulta queda `... WHERE correo = 'admin@eltornillo.local' -- -' AND password = MD5('...')`; todo lo que sigue a `-- ` se ignora y se inicia sesión sin saber la contraseña. También funciona `' OR '1'='1' -- -`, que devuelve la primera fila (el administrador).
+2. **Reconocer la inyección en el buscador.** Escribir una comilla simple (`'`) en el buscador del catálogo provoca un error de MySQL visible en pantalla: es la señal de que la entrada llega sin escapar a la consulta.
+3. **Extraer datos con UNION.** A través del buscador (`index.php?q=...`), con una carga tipo `' UNION SELECT 1,correo,password,rol,5,6 FROM usuarios -- -` se vuelcan los correos y los hashes MD5 de todos los usuarios. Los hashes MD5 de contraseñas débiles (`Admin123`, etc.) se rompen con cualquier servicio o diccionario, lo que da acceso a todas las cuentas de la aplicación.
 
-**Dónde se encuentra:** `docker/docker-compose.yml`.
+**Pistas dejadas (visibles para el atacante):**
 
 **Cómo se introdujo y por qué es explotable.** No basta con "dejar un puerto abierto": la exposición se diseñó para que lleve a un compromiso real y acotado de la base de datos. Se combinan cuatro condiciones:
  

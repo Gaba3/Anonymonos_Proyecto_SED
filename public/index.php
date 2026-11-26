@@ -93,6 +93,18 @@ require_once __DIR__ . '/../includes/header.php';
             <p class="text-secondary mb-0"><?= e(APP_LEMA) ?></p>
         </div>
         <div class="col-md-5">
+            <?php
+            /*
+             * PISTA SUTIL para la etapa de ataque (V1 — inyección SQL).
+             *
+             * Comentario tipo "nota de desarrollo" que insinúa que el texto
+             * del buscador se usa tal cual dentro de la consulta. Combinado
+             * con el error de MySQL que aparece al escribir una comilla (')
+             * en la búsqueda, orienta al atacante hacia la SQLi. No dice cómo
+             * explotarla.
+             */
+            ?>
+            <!-- buscador: filtra productos por el texto que se escribe, directo contra la tabla productos -->
             <form class="d-flex gap-2" method="get" action="<?= url('index.php') ?>" role="search">
                 <input class="form-control" type="search" name="q"
                        value="<?= e($q) ?>"
@@ -150,7 +162,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
             <div class="card card-producto">
                 <div class="caja-imagen">
-                    <img src="<?= e(imagen_producto($p['imagen'])) ?>"
+                    <img src="<?= e(imagen_producto($p['imagen'], $p['nombre'])) ?>"
                          alt="<?= e($p['nombre']) ?>" loading="lazy">
                 </div>
                 <div class="card-body d-flex flex-column">

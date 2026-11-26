@@ -5,7 +5,10 @@ define('DB_HOST', '127.0.0.1');
 define('DB_PORT', 3306);
 define('DB_NAME', 'ferreteria');
 define('DB_USER', 'ferreteria_app');
-define('DB_PASS', 'App.Tornillo.2026');
+// La contraseña de la cuenta de la aplicación coincide con docker-compose.yml.
+// Es débil a propósito: forma parte de la vulnerabilidad V2 (base de datos
+// expuesta a la red con una cuenta de contraseña adivinable).
+define('DB_PASS', 'ferreteria');
 
 // ---------------------------------------------------------------------
 // Datos del sitio
@@ -69,13 +72,19 @@ function dinero($monto): string
     return '$' . number_format((float) $monto, 2, '.', ',');
 }
 
-function imagen_producto(?string $archivo): string
+function imagen_producto(?string $archivo, string $nombre = ''): string
 {
-    if ($archivo === null || trim($archivo) === '') {
-        return IMG_SIN_FOTO;
+    if ($archivo !== null && trim($archivo) !== '') {
+        return URL_UPLOADS . rawurlencode($archivo);
     }
 
-    return URL_UPLOADS . rawurlencode($archivo);
+    $imagen_catalogo = str_replace(['/', '\\'], '⁄', $nombre) . '.jpg';
+
+    if (is_file(__DIR__ . '/../public/assets/catalog/' . $imagen_catalogo)) {
+        return url('assets/catalog/' . rawurlencode($imagen_catalogo));
+    }
+
+    return IMG_SIN_FOTO;
 }
 
 function fecha_legible(?string $fecha): string

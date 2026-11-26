@@ -12,11 +12,11 @@
  * ---------------------------------------------------------------------
  * ESTA PANTALLA NO ES VULNERABLE — ES A PROPÓSITO
  * ---------------------------------------------------------------------
- * Las tres vulnerabilidades del proyecto están acotadas y documentadas
- * en la sección 5 del README.md: V1 vive en login.php e index.php, V2 en
- * docker-compose.yml y V3 en comprador/factura.php. Aquí las consultas
- * usan mysqli_prepare() y bind_param(), que es justamente la mitigación
- * que V1 no aplica. Sirve de contraste al comparar las dos pantallas.
+ * Las dos vulnerabilidades del proyecto están acotadas y documentadas
+ * en la sección 5 del README.md: V1 vive en login.php e index.php y V2 en
+ * docker-compose.yml. Aquí las consultas usan mysqli_prepare() y
+ * bind_param(), que es justamente la mitigación que V1 no aplica. Sirve
+ * de contraste al comparar las dos pantallas.
  *
  * La contraseña sí se guarda con MD5 porque la columna usuarios.password
  * es CHAR(32) y los usuarios de prueba de 02_seed.sql se crearon así. Es
